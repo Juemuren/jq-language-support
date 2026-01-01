@@ -48,7 +48,7 @@
 		"keywords": {
 			"patterns": [{
 				"name": "keyword.jq",
-				"match": "(?<!\\.|\\$)\\b(and|as|empty|not|or|reduce)\\b(?!\\.)"
+				"match": "(?<!\\.|\\$)\\b(and|as|not|or|reduce)\\b(?!\\.)"
 			}, {
 				"name": "keyword.control.jq",
 				"match": "(?<!\\.|\\$)\\b(break|catch|elif|else|end|if|label|then|try)\\b(?!\\.)"
