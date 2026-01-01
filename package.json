@@ -1,8 +1,12 @@
 {
   "name": "jq-language-support",
-  "displayName": "jq-language-support",
+  "displayName": "jq Language Support",
   "description": "jq Language Support for VS Code",
   "version": "0.0.1",
+  "repository": {
+    "type": "git",
+    "url": "https://github.com/juemuren/jq-language-support.git"
+  },
   "engines": {
     "vscode": "^1.107.0"
   },
@@ -11,6 +15,7 @@
   ],
   "activationEvents": [],
   "main": "./out/extension.js",
+  "icon": "images/jq-dark.png",
   "contributes": {
     "languages": [
       {
@@ -21,7 +26,11 @@
         "extensions": [
           ".jq"
         ],
-        "configuration": "./language-configuration.json"
+        "configuration": "./language-configuration.json",
+        "icon": {
+          "dark": "images/jq-dark.png",
+          "light": "images/jq-light.png"
+        }
       }
     ],
     "grammars": [
