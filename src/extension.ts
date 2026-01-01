@@ -3,14 +3,31 @@ import * as vscode from 'vscode';
 // -----------------------------------------------------------------------------
 // 常量定义
 // -----------------------------------------------------------------------------
-const BUILTINS = [
-	'length', 'keys', 'map', 'select', 'has', 'contains', 'unique', 'sort',
-	'group_by', 'to_entries', 'from_entries', 'split', 'join', 'tostring',
-	'tonumber', 'range', 'limit', 'isempty', 'error', 'empty', 'debug',
-	'type', 'del', 'walk', 'transpose', 'all', 'any'
-];
 
-const KEYWORDS = ['def', 'if', 'then', 'else', 'elif', 'end'];
+const BUILTINS = [
+	'abs', 'add', 'all', 'any', 'arrays', 'ascii_downcase', 'ascii_upcase',
+	'booleans', 'bsearch', 'builtins',
+	'capture', 'combinations', 'contains',
+	'debug', 'del',
+	'endswith', 'env', 'error', 'explode',
+	'first', 'flatten', 'floor', 'foreach', 'from_entries', 'fromstream',
+	'getpath', 'group_by', 'gsub',
+	'has', 'halt', 'halt_error',
+	'in', 'index', 'indices', 'infinite', 'input', 'input_filename', 'input_line_number', 'inside', 'isfinite', 'isnan', 'isnormal',
+	'join',
+	'keys', 'keys_unsorted',
+	'last', 'ltrimstr', 'length', 'limit',
+	'map', 'map_values', 'match', 'max', 'max_by', 'min', 'min_by',
+	'nan', 'numbers',
+	'objects',
+	'path', 'paths',
+	'range', 'recurse', 'reverse', 'rindex', 'rtrimstr',
+	'scalars', 'select', 'setpath', 'sort', 'sort_by', 'split', 'sqrt', 'startswith', 'strings', 'sub',
+	'test', 'to_entries', 'tonumber', 'tostream', 'tostring', 'transpose', 'type',
+	'unique', 'unique_by',
+	'values',
+	'walk', 'while', 'with_entries'
+];
 
 // 语义高亮图例
 const tokenTypes = ['function', 'parameter', 'variable'];
@@ -24,9 +41,10 @@ const legend = new vscode.SemanticTokensLegend(tokenTypes, tokenModifiers);
 // 用于存储解析出的函数信息
 interface JQFunction {
 	name: string;
-	args: string[];
+	valueArgs: string[];
+	filterArgs: string[];
 	startLine: number;
-	endLine: number; // 作用域判断
+	endLine: number;
 }
 
 // 文档解析器
@@ -35,48 +53,107 @@ class JQParser {
 		const functions: JQFunction[] = [];
 		const lines = text.split(/\r?\n/);
 
-		// 函数定义
-		// def \s+ (名字) (?: \( (参数) \) )? :
-		const defRegex = /def\s+([a-zA-Z0-9_]+)(?:\(([^)]+)\))?\s*:/;
+		// 第一遍：收集所有定义，记录行号、缩进、参数
+		const defRegex = /^(\s*)def\s+([a-zA-Z_][a-zA-Z0-9_]*)(?:\(([^)]*)\))?\s*:/;
+		const defs: Array<{
+			name: string;
+			valueArgs: string[];
+			filterArgs: string[];
+			startLine: number;
+			indent: number;
+		}> = [];
 
 		for (let i = 0; i < lines.length; i++) {
-			const line = lines[i];
-			const match = defRegex.exec(line);
-
+			const match = defRegex.exec(lines[i]);
 			if (match) {
-				const funcName = match[1];
-				const rawArgs = match[2] ? match[2].split(';').map(s => s.trim()) : [];
+				const indent = match[1].length;
+				const funcName = match[2];
+				const rawArgsStr = match[3] || '';
 
-				// 计算结束行
-				let endLine = lines.length - 1;
-				for (let j = i + 1; j < lines.length; j++) {
-					if (/^\s*def\s+/.test(lines[j])) {
-						endLine = j - 1;
-						break;
-					}
-				}
+				// 分离值参数和过滤器参数
+				const args = rawArgsStr.split(';').map(s => s.trim()).filter(s => s);
+				const valueArgs = args.filter(a => a.startsWith('$'));
+				const filterArgs = args.filter(a => !a.startsWith('$'));
 
-				functions.push({
+				defs.push({
 					name: funcName,
-					args: rawArgs,
+					valueArgs,
+					filterArgs,
 					startLine: i,
-					endLine: endLine
+					indent
 				});
 			}
 		}
+
+		// 第二遍：根据缩进确定每个函数的结束行
+		for (let i = 0; i < defs.length; i++) {
+			const currentDef = defs[i];
+			let endLine = lines.length - 1;
+
+			// 查找函数体结束
+			for (let j = currentDef.startLine + 1; j < lines.length; j++) {
+				const line = lines[j].trim();
+				// 跳过空行和注释行
+				if (line === '' || line.startsWith('#')) {
+					continue;
+				}
+				// 检查缩进
+				const lineIndent = lines[j].length - lines[j].trimStart().length;
+				if (lineIndent <= currentDef.indent) {
+					endLine = j - 1;
+					break;
+				}
+			}
+
+			functions.push({
+				name: currentDef.name,
+				valueArgs: currentDef.valueArgs,
+				filterArgs: currentDef.filterArgs,
+				startLine: currentDef.startLine,
+				endLine
+			});
+		}
+
 		return functions;
+	}
+
+	// 判断是否在注释内
+	static isInComment(text: string, offset: number): boolean {
+		// 查找最近的换行符
+		const lineStart = text.lastIndexOf('\n', offset - 1) + 1;
+		const line = text.substring(lineStart, text.indexOf('\n', lineStart + 1) === -1 ? text.length : text.indexOf('\n', lineStart + 1));
+		return /^\s*#/.test(line);
 	}
 }
 
 // -----------------------------------------------------------------------------
 // 语义高亮
 // -----------------------------------------------------------------------------
+
+// 设置全局参数映射
 class JQSemanticTokensProvider implements vscode.DocumentSemanticTokensProvider {
 	provideDocumentSemanticTokens(document: vscode.TextDocument): vscode.ProviderResult<vscode.SemanticTokens> {
 		const tokensBuilder = new vscode.SemanticTokensBuilder(legend);
 		const text = document.getText();
 		const userFunctions = JQParser.parse(text);
 		const userFuncNames = new Set(userFunctions.map(f => f.name));
+
+		// 构建参数映射
+		const allParams = new Set<string>();
+		userFunctions.forEach(f => {
+			f.valueArgs.forEach(arg => {
+				const name = arg.startsWith('$') ? arg.substring(1) : arg;
+				allParams.add(name);
+			});
+			f.filterArgs.forEach(arg => {
+				allParams.add(arg);
+			});
+		});
+
+		// 构建函数上下文映射
+		const getContextFunction = (line: number): JQFunction | undefined => {
+			return userFunctions.find(f => line >= f.startLine && line <= f.endLine);
+		};
 
 		// 词法分析
 		const tokenRegex = /([a-zA-Z_][a-zA-Z0-9_]*)/g;
@@ -87,8 +164,40 @@ class JQSemanticTokensProvider implements vscode.DocumentSemanticTokensProvider 
 			const offset = match.index;
 			const position = document.positionAt(offset);
 
-			// 判断是否是函数
-			if (userFuncNames.has(word) && !BUILTINS.includes(word) && !KEYWORDS.includes(word)) {
+			// 跳过注释区域
+			if (JQParser.isInComment(text, offset)) { continue; }
+
+			// 检查当前位置是否在某个函数定义行
+			const contextFunc = getContextFunction(position.line);
+
+			// 优先级1：检查是否是当前函数的参数
+			if (contextFunc) {
+				const isValueParam = contextFunc.valueArgs.some(arg => {
+					const paramName = arg.startsWith('$') ? arg.substring(1) : arg;
+					return paramName === word;
+				});
+				const isFilterParam = contextFunc.filterArgs.some(arg => arg === word);
+
+				if (isValueParam || isFilterParam) {
+					tokensBuilder.push(
+						new vscode.Range(position, position.translate(0, word.length)),
+						'parameter'
+					);
+					continue;
+				}
+			}
+
+			// 优先级2：用户自定义函数高亮
+			if (userFuncNames.has(word)) {
+				tokensBuilder.push(
+					new vscode.Range(position, position.translate(0, word.length)),
+					'function'
+				);
+				continue;
+			}
+
+			// 优先级3：内置函数高亮
+			if (BUILTINS.includes(word) && !allParams.has(word)) {
 				tokensBuilder.push(
 					new vscode.Range(position, position.translate(0, word.length)),
 					'function'
@@ -117,29 +226,41 @@ class JQCompletionItemProvider implements vscode.CompletionItemProvider {
 		// 判断光标是否在函数定义内部
 		const currentFunc = functions.find(f => position.line >= f.startLine && position.line <= f.endLine);
 
-		// 参数补全
+		// 参数补全（值参数）
 		if (currentFunc) {
-			currentFunc.args.forEach(arg => {
+			// 值参数补全
+			currentFunc.valueArgs.forEach(arg => {
 				// 统一格式化为 $name
 				const fullVarName = arg.startsWith('$') ? arg : '$' + arg;
+				const paramName = arg.startsWith('$') ? arg.substring(1) : arg;
 
 				const item = new vscode.CompletionItem(fullVarName, vscode.CompletionItemKind.Variable);
-				item.detail = `Parameter of ${currentFunc.name}`;
+				item.detail = `Value parameter of ${currentFunc.name}`;
 				item.sortText = "0000";
 
-				// 若已输入了 $ 则补全中不包含 $
+				// 若已输入了 $ 则补全中去除 $
 				if (isTriggeredByDollar) {
-					item.insertText = fullVarName.substring(1);
-					item.filterText = fullVarName.substring(1);
+					item.insertText = paramName;
+					item.filterText = paramName;
 				} else {
 					item.insertText = fullVarName;
 				}
 
 				completions.push(item);
 			});
+
+			// 过滤器参数补全
+			currentFunc.filterArgs.forEach(arg => {
+				const item = new vscode.CompletionItem(arg, vscode.CompletionItemKind.Variable);
+				item.detail = `Filter parameter of ${currentFunc.name}`;
+				item.sortText = "0001";
+				item.insertText = arg;
+
+				completions.push(item);
+			});
 		}
 
-		// 提供用户定义的其他函数
+		// 用户定义函数补全
 		functions.forEach(f => {
 			// 避免递归提示
 			if (f.name !== currentFunc?.name) {
@@ -147,8 +268,12 @@ class JQCompletionItemProvider implements vscode.CompletionItemProvider {
 				item.detail = `User defined function`;
 
 				// 自动补全参数
-				if (f.args.length > 0) {
-					const argsSnippet = f.args.map((arg, idx) => `\${${idx + 1}:${arg}}`).join('; ');
+				const allArgs = [...f.valueArgs, ...f.filterArgs];
+				if (allArgs.length > 0) {
+					const argsSnippet = allArgs.map((arg, idx) => {
+						const paramName = arg.startsWith('$') ? arg.substring(1) : arg;
+						return `\${${idx + 1}:${paramName}}`;
+					}).join('; ');
 					item.insertText = new vscode.SnippetString(`${f.name}(${argsSnippet})`);
 				} else {
 					item.insertText = f.name;

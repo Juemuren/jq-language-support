@@ -7,7 +7,6 @@
     { "include": "#strings" },
     { "include": "#definitions" },
     { "include": "#keywords" },
-    { "include": "#builtins" },
     { "include": "#operators" },
     { "include": "#numbers" },
     { "include": "#properties" },
@@ -46,18 +45,18 @@
         "4": { "name": "punctuation.separator.jq" }
       }
     },
-    "keywords": {
-      "patterns": [{
-        "name": "keyword.control.jq",
-        "match": "\\b(if|then|else|elif|end|reduce|foreach|as|try|catch|label|break|import|include|module)\\b"
-      }]
-    },
-    "builtins": {
-      "patterns": [{
-        "name": "support.function.builtin.jq",
-        "match": "\\b(length|keys|map|select|has|contains|unique|sort|group_by|to_entries|from_entries|split|join|tostring|tonumber|range|limit|isempty|error|empty|debug|type|infinite|nan|in|inside|paths|del|recurse|walk|transpose|bsearch)\\b"
-      }]
-    },
+		"keywords": {
+			"patterns": [{
+				"name": "keyword.jq",
+				"match": "(?<!\\.|\\$)\\b(and|as|empty|not|or|reduce)\\b(?!\\.)"
+			}, {
+				"name": "keyword.control.jq",
+				"match": "(?<!\\.|\\$)\\b(break|catch|elif|else|end|if|label|then|try)\\b(?!\\.)"
+			}, {
+				"name": "constant.language.jq",
+				"match": "(?<!\\.|\\$)\\b(false|null|true)\\b(?!\\.)"
+			}]
+		},
     "operators": {
       "patterns": [
         {
