@@ -4,30 +4,8 @@ import * as vscode from 'vscode';
 // 常量定义
 // -----------------------------------------------------------------------------
 
-const BUILTINS = [
-	'abs', 'add', 'all', 'any', 'arrays', 'ascii_downcase', 'ascii_upcase',
-	'booleans', 'bsearch', 'builtins',
-	'capture', 'combinations', 'contains',
-	'debug', 'del',
-	'endswith', 'env', 'error', 'explode',
-	'first', 'flatten', 'floor', 'foreach', 'from_entries', 'fromstream',
-	'getpath', 'group_by', 'gsub',
-	'has', 'halt', 'halt_error',
-	'in', 'index', 'indices', 'infinite', 'input', 'input_filename', 'input_line_number', 'inside', 'isfinite', 'isnan', 'isnormal',
-	'join',
-	'keys', 'keys_unsorted',
-	'last', 'ltrimstr', 'length', 'limit',
-	'map', 'map_values', 'match', 'max', 'max_by', 'min', 'min_by',
-	'nan', 'numbers',
-	'objects',
-	'path', 'paths',
-	'range', 'recurse', 'reverse', 'rindex', 'rtrimstr',
-	'scalars', 'select', 'setpath', 'sort', 'sort_by', 'split', 'sqrt', 'startswith', 'strings', 'sub',
-	'test', 'to_entries', 'tonumber', 'tostream', 'tostring', 'transpose', 'type',
-	'unique', 'unique_by',
-	'values',
-	'walk', 'while', 'with_entries'
-];
+// 内置函数
+import BUILTINS from './builtins.json';
 
 // 语义高亮图例
 const tokenTypes = ['function', 'parameter', 'variable'];
