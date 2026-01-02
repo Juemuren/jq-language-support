@@ -15,7 +15,7 @@
   ],
   "activationEvents": [],
   "main": "./out/extension.js",
-  "icon": "images/jq-dark.png",
+  "icon": "images/icons/jq-dark.png",
   "contributes": {
     "languages": [
       {
@@ -28,8 +28,8 @@
         ],
         "configuration": "./language-configuration.json",
         "icon": {
-          "dark": "images/jq-dark.png",
-          "light": "images/jq-light.png"
+          "dark": "images/icons/jq-dark.png",
+          "light": "images/icons/jq-light.png"
         }
       }
     ],
